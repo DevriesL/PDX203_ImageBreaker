@@ -1,0 +1,6 @@
+CONFIG_IDTP9382A=y
+CONFIG_MACH_SONY_PDX203_J=y
+CONFIG_MMTUNER_MN8855x=y
+# CONFIG_MMTUNER_DEBUG is not set
+
+# ImageBreaker Additional Kernel Config
