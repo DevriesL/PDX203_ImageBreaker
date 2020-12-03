@@ -46,7 +46,11 @@ struct mipi_dsi_msg {
 	u32 wait_ms;
 
 	size_t tx_len;
+#ifdef CONFIG_HYBRID_DC_DIMMING
+	u8 *tx_buf;
+#else
 	const void *tx_buf;
+#endif
 
 	size_t rx_len;
 	void *rx_buf;

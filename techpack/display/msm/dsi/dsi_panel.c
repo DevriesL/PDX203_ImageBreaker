@@ -18,6 +18,10 @@
 #include "dsi_panel_driver.h"
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
+#ifdef CONFIG_HYBRID_DC_DIMMING
+#include "dsi_panel_dimming.h"
+#endif
+
 /**
  * topology is currently defined by a set of following 3 values:
  * 1. num of layer mixers
@@ -747,7 +751,11 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 
 	dsi = &panel->mipi_device;
 
+#ifdef CONFIG_HYBRID_DC_DIMMING
+	rc = dsi_panel_brightness_dcs(panel, bl_lvl);
+#else
 	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
+#endif
 	if (rc < 0)
 		DSI_ERR("failed to update dcs backlight:%d\n", bl_lvl);
 
@@ -1857,6 +1865,17 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"somc,mdss-dsi-opec-on-command",
 	"somc,mdss-dsi-opec-off-command",
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+#ifdef CONFIG_HYBRID_DC_DIMMING
+	"acl_on_tx_cmds",
+	"gamma_mode2_normal_tx_cmds",
+	"level0_key_enable_tx_cmds",
+	"level0_key_disable_tx_cmds",
+	"level1_key_enable_tx_cmds",
+	"level1_key_disable_tx_cmds",
+	"level2_key_enable_tx_cmds",
+	"level2_key_disable_tx_cmds",
+	"brightness_tx_cmds",
+#endif
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -2059,6 +2078,98 @@ error:
 
 }
 
+#ifdef CONFIG_HYBRID_DC_DIMMING
+static int dsi_panel_parse_cmd_sets_dimming(struct dsi_panel_cmd_set *cmd,
+					enum dsi_cmd_set_type type,
+					struct dsi_parser_utils *utils)
+{
+	int rc = 0;
+	u32 length = 0;
+	const char *data;
+	u32 packet_count = 0;
+
+	switch (type) {
+	case TX_ACL_ON:
+		data = acl_on_tx_cmds;
+		length = sizeof(acl_on_tx_cmds);
+		break;
+	case TX_GAMMA_MODE2_NORMAL:
+		data = gamma_mode2_normal_tx_cmds;
+		length = sizeof(gamma_mode2_normal_tx_cmds);
+		break;
+	case TX_LEVEL0_KEY_ENABLE:
+		data = level0_key_enable_tx_cmds;
+		length = sizeof(level0_key_enable_tx_cmds);
+		break;
+	case TX_LEVEL0_KEY_DISABLE:
+		data = level0_key_disable_tx_cmds;
+		length = sizeof(level0_key_disable_tx_cmds);
+		break;
+	case TX_LEVEL1_KEY_ENABLE:
+		data = level1_key_enable_tx_cmds;
+		length = sizeof(level1_key_enable_tx_cmds);
+		break;
+	case TX_LEVEL1_KEY_DISABLE:
+		data = level1_key_disable_tx_cmds;
+		length = sizeof(level1_key_disable_tx_cmds);
+		break;
+	case TX_LEVEL2_KEY_ENABLE:
+		data = level2_key_enable_tx_cmds;
+		length = sizeof(level2_key_enable_tx_cmds);
+		break;
+	case TX_LEVEL2_KEY_DISABLE:
+		data = level2_key_disable_tx_cmds;
+		length = sizeof(level2_key_disable_tx_cmds);
+		break;
+	case TX_BRIGHT_CTRL:
+		data = brightness_tx_cmds;
+		length = sizeof(brightness_tx_cmds);
+		break;
+	default:
+		DSI_DEBUG("%s commands not defined\n", cmd_set_prop_map[type]);
+		rc = -ENOTSUPP;
+		goto error;
+		break;
+	}
+
+	DSI_DEBUG("type=%d, name=%s, length=%d\n", type,
+		cmd_set_prop_map[type], length);
+
+	print_hex_dump_debug("", DUMP_PREFIX_NONE,
+		       8, 1, data, length, false);
+
+	rc = dsi_panel_get_cmd_pkt_count(data, length, &packet_count);
+	if (rc) {
+		DSI_ERR("commands failed, rc=%d\n", rc);
+		goto error;
+	}
+	DSI_DEBUG("[%s] packet-count=%d, %d\n", cmd_set_prop_map[type],
+		packet_count, length);
+
+	rc = dsi_panel_alloc_cmd_packets(cmd, packet_count);
+	if (rc) {
+		DSI_ERR("failed to allocate cmd packets, rc=%d\n", rc);
+		goto error;
+	}
+
+	rc = dsi_panel_create_cmd_packets(data, length, packet_count,
+					  cmd->cmds);
+	if (rc) {
+		DSI_ERR("failed to create cmd packets, rc=%d\n", rc);
+		goto error_free_mem;
+	}
+
+	cmd->state = DSI_CMD_SET_STATE_HS;
+
+	return rc;
+error_free_mem:
+	kfree(cmd->cmds);
+	cmd->cmds = NULL;
+error:
+	return rc;
+}
+#endif
+
 static int dsi_panel_parse_cmd_sets(
 		struct dsi_display_mode_priv_info *priv_info,
 		struct dsi_parser_utils *utils)
@@ -2083,6 +2194,16 @@ static int dsi_panel_parse_cmd_sets(
 				DSI_ERR("failed to allocate cmd set %d, rc = %d\n",
 					i, rc);
 			set->state = DSI_CMD_SET_STATE_LP;
+#ifdef CONFIG_HYBRID_DC_DIMMING
+		} else if (i == TX_ACL_ON || i == TX_GAMMA_MODE2_NORMAL ||
+				i == TX_LEVEL0_KEY_ENABLE || i == TX_LEVEL0_KEY_DISABLE ||
+				i == TX_LEVEL1_KEY_ENABLE || i == TX_LEVEL1_KEY_DISABLE ||
+				i == TX_LEVEL2_KEY_ENABLE || i == TX_LEVEL2_KEY_DISABLE ||
+				i == TX_BRIGHT_CTRL) {
+			rc = dsi_panel_parse_cmd_sets_dimming(set, i, utils);
+			if (rc)
+				DSI_DEBUG("failed to parse set %d\n", i);
+#endif
 		} else {
 			rc = dsi_panel_parse_cmd_sets_sub(set, i, utils);
 			if (rc)

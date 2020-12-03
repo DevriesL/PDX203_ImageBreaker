@@ -100,6 +100,8 @@ msm_drm-$(CONFIG_DRM_MSM_DSI) += dsi/dsi_phy.o \
 	dsi/dsi_clk_manager.o \
 	dsi/dsi_display_test.o \
 
+msm_drm-$(CONFIG_HYBRID_DC_DIMMING) += dsi/dsi_panel_dimming.o \
+
 msm_drm-$(CONFIG_DSI_PARSER) += dsi/dsi_parser.o \
 
 ifeq ($(CONFIG_DRM_SDE_SPECIFIC_PANEL),y)
