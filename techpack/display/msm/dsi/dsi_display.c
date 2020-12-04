@@ -25,6 +25,10 @@
 #include "dsi_panel_driver.h"
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
+#ifdef CONFIG_FLICKER_FREE_DIMMING
+#include "sde_expo_dim_layer.h"
+#endif
+
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
 #define NO_OVERRIDE -1
@@ -244,6 +248,12 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 		       dsi_display->name, rc);
 		goto error;
 	}
+
+#ifdef CONFIG_FLICKER_FREE_DIMMING
+	if (bl_lvl && !panel->spec_pdata->aod_mode) {
+		bl_temp = expo_map_dim_level((u32)bl_temp, dsi_display);
+	}
+#endif
 
 #ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 	dsi_panel_driver_panel_update_area(panel, (u32)bl_temp);
