@@ -93,6 +93,68 @@ DEFINE_MUTEX(module_mutex);
 EXPORT_SYMBOL_GPL(module_mutex);
 static LIST_HEAD(modules);
 
+static const char *module_whitelist[] = {
+	"wlan",
+	"rmnet_perf",
+	"rmnet_shs",
+	"texfat",
+	"camera_sync",
+	"flash_led",
+	"tcs3490",
+	"sony_camera",
+	"slg51000_regulator",
+	"et580_int",
+	"powerkey_forcecrash",
+	"last_logs",
+	"bu520x1nvx",
+	"sec_touchscreen",
+	"pn553",
+	"machine_dlkm",
+	"wcd938x_slave_dlkm",
+	"wcd938x_dlkm",
+	"wcd9xxx_dlkm",
+	"mbhc_dlkm",
+	"tx_macro_dlkm",
+	"rx_macro_dlkm",
+	"va_macro_dlkm",
+	"wsa_macro_dlkm",
+	"swr_ctrl_dlkm",
+	"bolero_cdc_dlkm",
+	"wsa881x_dlkm",
+	"wcd_core_dlkm",
+	"stub_dlkm",
+	"hdmi_dlkm",
+	"swr_dlkm",
+	"pinctrl_lpi_dlkm",
+	"pinctrl_wcd_dlkm",
+	"usf_dlkm",
+	"native_dlkm",
+	"platform_dlkm",
+	"q6_dlkm",
+	"adsp_loader_dlkm",
+	"apr_dlkm",
+	"snd_event_dlkm",
+	"q6_notifier_dlkm",
+	"q6_pdr_dlkm",
+};
+
+static bool whitelisted(const char *module_name) {
+	size_t i, len, sum = sizeof(module_whitelist) / sizeof(char *);
+
+	for (i = 0; i < sum; i++) {
+		len = strlen(module_whitelist[i]);
+		if (len > 0) {
+			if(!strncmp(module_whitelist[i], module_name, len)) {
+				return true;
+			}
+		} else {
+			continue;
+		}
+	}
+
+	return false;
+}
+
 #ifdef CONFIG_MODULES_TREE_LOOKUP
 
 /*
@@ -1286,6 +1348,9 @@ static int check_version(const struct load_info *info,
 	unsigned int versindex = info->index.vers;
 	unsigned int i, num_versions;
 	struct modversion_info *versions;
+
+	if (whitelisted(mod->name))
+		return 1;
 
 	/* Exporting module didn't supply crcs?  OK, we're already tainted. */
 	if (!crc)
@@ -3041,6 +3106,9 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 	if (flags & MODULE_INIT_IGNORE_VERMAGIC)
 		modmagic = NULL;
 
+	if (whitelisted(mod->name))
+		goto skip_magic_check;
+
 	/* This is allowed: modprobe --force will invalidate it. */
 	if (!modmagic) {
 		err = try_to_force_load(mod, "bad vermagic");
@@ -3052,6 +3120,7 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 		return -ENOEXEC;
 	}
 
+skip_magic_check:
 	if (!get_modinfo(info, "intree")) {
 		if (!test_taint(TAINT_OOT_MODULE))
 			pr_warn("%s: loading out-of-tree module taints kernel.\n",

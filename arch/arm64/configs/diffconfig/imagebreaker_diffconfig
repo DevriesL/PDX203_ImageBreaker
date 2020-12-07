@@ -4,3 +4,5 @@ CONFIG_MMTUNER_MN8855x=y
 # CONFIG_MMTUNER_DEBUG is not set
 
 # ImageBreaker Additional Kernel Config
+CONFIG_MODULE_FORCE_LOAD=y
+# CONFIG_MODULE_SIG is not set
